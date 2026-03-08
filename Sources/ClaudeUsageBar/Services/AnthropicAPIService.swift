@@ -41,11 +41,15 @@ final class AuthService: ObservableObject {
 
     init() {
         isAuthenticated = loadToken() != nil
-        requestNotificationPermission()
     }
 
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            if let error {
+                print("Notification permission error: \(error)")
+            }
+            print("Notification permission granted: \(granted)")
+        }
     }
 
     // MARK: - Polling
