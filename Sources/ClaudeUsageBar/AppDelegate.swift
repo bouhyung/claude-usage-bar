@@ -25,12 +25,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel = NSPanel(
             contentRect: .zero,
-            styleMask: [.nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.titled, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: true
         )
         panel.isFloatingPanel = true
         panel.level = .statusBar
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
         panel.contentView = hostingView
         panel.isOpaque = false
         panel.backgroundColor = .clear

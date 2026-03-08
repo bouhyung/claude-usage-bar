@@ -44,6 +44,10 @@ final class AuthService: ObservableObject {
     }
 
     func requestNotificationPermission() {
+        guard Bundle.main.bundleIdentifier != nil else {
+            print("Skipping notification permission: no bundle identifier (running via swift run?)")
+            return
+        }
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error {
                 print("Notification permission error: \(error)")
@@ -168,7 +172,7 @@ final class AuthService: ObservableObject {
 
     // MARK: - Fetch Usage
 
-    private static let minFetchInterval: TimeInterval = 30
+    private static let minFetchInterval: TimeInterval = 120
 
     func fetchUsage(force: Bool = false) async {
         // Skip if fetched recently (unless forced by timer)
@@ -228,6 +232,7 @@ final class AuthService: ObservableObject {
     // MARK: - Reset Notification
 
     private func sendResetNotification() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = "Claude Usage Reset"
         content.body = "5-hour usage limit has been reset!"
