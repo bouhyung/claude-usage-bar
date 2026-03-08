@@ -24,6 +24,9 @@ cp "$BUILD_DIR/arm64-apple-macosx/release/$BUNDLE_NAME" "$APP_DIR/Contents/MacOS
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
+# Ad-hoc code sign (required for notification permissions)
+codesign --force --deep --sign - "$APP_DIR"
+
 echo "✓ Built: $APP_DIR"
 echo ""
 echo "To install: cp -r \"$APP_DIR\" /Applications/"

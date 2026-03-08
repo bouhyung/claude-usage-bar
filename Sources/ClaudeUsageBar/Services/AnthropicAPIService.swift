@@ -56,12 +56,12 @@ final class AuthService: ObservableObject {
 
     func startPolling() {
         guard isAuthenticated else { return }
-        Task { await fetchUsage() }
+        Task { await fetchUsage(force: true) }
         timer?.invalidate()
         let t = Timer(timeInterval: pollingInterval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isAuthenticated else { return }
-                Task { await self.fetchUsage() }
+                Task { await self.fetchUsage(force: true) }
             }
         }
         RunLoop.main.add(t, forMode: .common)
@@ -168,7 +168,14 @@ final class AuthService: ObservableObject {
 
     // MARK: - Fetch Usage
 
-    func fetchUsage() async {
+    private static let minFetchInterval: TimeInterval = 30
+
+    func fetchUsage(force: Bool = false) async {
+        // Skip if fetched recently (unless forced by timer)
+        if !force, let last = lastUpdated, Date().timeIntervalSince(last) < Self.minFetchInterval {
+            return
+        }
+
         guard let token = loadToken() else {
             lastError = "Not signed in"
             isAuthenticated = false
@@ -188,6 +195,12 @@ final class AuthService: ObservableObject {
             if http.statusCode == 401 {
                 lastError = "Session expired — sign in again"
                 signOut()
+                return
+            }
+            if http.statusCode == 429 {
+                // Silently ignore rate limit if we already have data
+                if usage != nil { return }
+                lastError = "Rate limited — try again later"
                 return
             }
             guard http.statusCode == 200 else {
