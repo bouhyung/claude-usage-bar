@@ -10,6 +10,10 @@
 
 ---
 
+<p align="center">
+  <img src="Resources/screenshot.png" width="500" alt="Claude Usage Bar screenshot">
+</p>
+
 ## Features
 
 - **Status bar display** — Shows 5-hour and 7-day usage with color indicators
