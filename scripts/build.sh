@@ -20,8 +20,9 @@ mkdir -p "$APP_DIR/Contents/Resources"
 # Copy binary
 cp "$BUILD_DIR/arm64-apple-macosx/release/$BUNDLE_NAME" "$APP_DIR/Contents/MacOS/$BUNDLE_NAME"
 
-# Copy Info.plist
+# Copy Info.plist and icon
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
+cp "$PROJECT_DIR/Resources/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
 
 echo "✓ Built: $APP_DIR"
 echo ""
