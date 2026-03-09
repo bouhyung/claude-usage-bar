@@ -26,11 +26,19 @@ final class AuthService: ObservableObject {
     private var oauthState: String?
 
     // Token file storage
-    private static var tokenFileURL: URL {
+    private static var configDir: URL {
         let dir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/claude-usage-bar", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("token")
+        return dir
+    }
+
+    private static var tokenFileURL: URL {
+        configDir.appendingPathComponent("token")
+    }
+
+    private static var refreshTokenFileURL: URL {
+        configDir.appendingPathComponent("refresh_token")
     }
 
     var pct5h: Double { (usage?.fiveHour?.utilization ?? 0) / 100.0 }
@@ -150,6 +158,9 @@ final class AuthService: ObservableObject {
             }
 
             saveToken(accessToken)
+            if let refreshToken = json["refresh_token"] as? String {
+                saveRefreshToken(refreshToken)
+            }
             isAuthenticated = true
             isAwaitingCode = false
             lastError = nil
@@ -197,6 +208,12 @@ final class AuthService: ObservableObject {
                 return
             }
             if http.statusCode == 401 {
+                // Try refreshing the token before signing out
+                if await refreshAccessToken() {
+                    // Retry the request with the new token
+                    await fetchUsage(force: true)
+                    return
+                }
                 lastError = "Session expired — sign in again"
                 signOut()
                 return
@@ -291,6 +308,58 @@ final class AuthService: ObservableObject {
 
     private func deleteToken() {
         try? FileManager.default.removeItem(at: Self.tokenFileURL)
+        try? FileManager.default.removeItem(at: Self.refreshTokenFileURL)
+    }
+
+    private func saveRefreshToken(_ token: String) {
+        let url = Self.refreshTokenFileURL
+        try? Data(token.utf8).write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+
+    private func loadRefreshToken() -> String? {
+        guard let data = try? Data(contentsOf: Self.refreshTokenFileURL) else { return nil }
+        let token = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return token?.isEmpty == false ? token : nil
+    }
+
+    // MARK: - Token Refresh
+
+    private var isRefreshing = false
+
+    private func refreshAccessToken() async -> Bool {
+        guard !isRefreshing, let refreshToken = loadRefreshToken() else { return false }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        var request = URLRequest(url: tokenEndpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: String] = [
+            "grant_type": "refresh_token",
+            "refresh_token": refreshToken,
+            "client_id": clientId,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newAccessToken = json["access_token"] as? String else {
+                return false
+            }
+            saveToken(newAccessToken)
+            if let newRefreshToken = json["refresh_token"] as? String {
+                saveRefreshToken(newRefreshToken)
+            }
+            return true
+        } catch {
+            return false
+        }
     }
 }
 
