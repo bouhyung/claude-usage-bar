@@ -15,7 +15,6 @@ final class AuthService: ObservableObject {
     private var timer: Timer?
     private var resetFlashTimer: Timer?
     private var previous5hPct: Double = 0
-    private var previous5hResetsAt: String?
     private let usageEndpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     private let pollingInterval: TimeInterval = 300
 
@@ -214,25 +213,13 @@ final class AuthService: ObservableObject {
             }
             let newUsage = try JSONDecoder().decode(UsageResponse.self, from: data)
             let new5hPct = newUsage.fiveHour?.usedPercentage ?? 0
-            let new5hResetsAt = newUsage.fiveHour?.resetsAt
 
-            // Detect 5h reset: resetsAt changed (new window started) while we had meaningful usage
-            let resetDetected: Bool
-            if let prev = previous5hResetsAt, let new = new5hResetsAt, prev != new, previous5hPct >= 10 {
-                resetDetected = true
-            } else if previous5hPct >= 50 && new5hPct < 10 {
-                // Fallback: percentage drop detection
-                resetDetected = true
-            } else {
-                resetDetected = false
-            }
-
-            if resetDetected {
+            // Detect 5h reset: significant percentage drop indicates window reset
+            if previous5hPct >= 20 && new5hPct < previous5hPct * 0.3 {
                 sendResetNotification()
                 showResetFlash()
             }
             previous5hPct = new5hPct
-            previous5hResetsAt = new5hResetsAt
 
             usage = newUsage
             lastError = nil
