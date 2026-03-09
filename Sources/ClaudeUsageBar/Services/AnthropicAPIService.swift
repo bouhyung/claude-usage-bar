@@ -15,6 +15,7 @@ final class AuthService: ObservableObject {
     private var timer: Timer?
     private var resetFlashTimer: Timer?
     private var previous5hPct: Double = 0
+    private var previous5hResetsAt: String?
     private let usageEndpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     private let pollingInterval: TimeInterval = 300
 
@@ -213,13 +214,25 @@ final class AuthService: ObservableObject {
             }
             let newUsage = try JSONDecoder().decode(UsageResponse.self, from: data)
             let new5hPct = newUsage.fiveHour?.usedPercentage ?? 0
+            let new5hResetsAt = newUsage.fiveHour?.resetsAt
 
-            // Detect 5h reset: was high (>=50%), now low
-            if previous5hPct >= 50 && new5hPct < 10 {
+            // Detect 5h reset: resetsAt changed (new window started) while we had meaningful usage
+            let resetDetected: Bool
+            if let prev = previous5hResetsAt, let new = new5hResetsAt, prev != new, previous5hPct >= 10 {
+                resetDetected = true
+            } else if previous5hPct >= 50 && new5hPct < 10 {
+                // Fallback: percentage drop detection
+                resetDetected = true
+            } else {
+                resetDetected = false
+            }
+
+            if resetDetected {
                 sendResetNotification()
                 showResetFlash()
             }
             previous5hPct = new5hPct
+            previous5hResetsAt = new5hResetsAt
 
             usage = newUsage
             lastError = nil
@@ -232,18 +245,22 @@ final class AuthService: ObservableObject {
     // MARK: - Reset Notification
 
     private func sendResetNotification() {
-        guard Bundle.main.bundleIdentifier != nil else { return }
-        let content = UNMutableNotificationContent()
-        content.title = "Claude Usage Reset"
-        content.body = "5-hour usage limit has been reset!"
-        content.sound = .default
+        if Bundle.main.bundleIdentifier != nil {
+            let content = UNMutableNotificationContent()
+            content.title = "Claude Usage Reset"
+            content.body = "5-hour usage limit has been reset!"
+            content.sound = .default
 
-        let request = UNNotificationRequest(
-            identifier: "5h-reset-\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+            let request = UNNotificationRequest(
+                identifier: "5h-reset-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request)
+        } else {
+            // Fallback for swift run (no bundle identifier)
+            NSSound.beep()
+        }
     }
 
     private func showResetFlash() {

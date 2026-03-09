@@ -81,6 +81,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func formatTimeRemaining(_ interval: TimeInterval?) -> String? {
+        guard let interval, interval > 0 else { return nil }
+        let totalMinutes = Int(interval) / 60
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours > 0 {
+            return "\(hours)h\(String(format: "%02d", minutes))m"
+        }
+        if minutes > 0 {
+            return "\(minutes)m"
+        }
+        return "<1m"
+    }
+
     private func colorForPct(_ pct: Double) -> NSColor {
         if pct >= 90 { return .systemRed }
         if pct >= 70 { return .systemOrange }
@@ -133,6 +147,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .font: font,
             .foregroundColor: colorForPct(pct5h)
         ]))
+
+        if let resetStr = formatTimeRemaining(usage.fiveHour?.timeUntilReset) {
+            let smallFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .medium)
+            result.append(NSAttributedString(string: " \(resetStr)", attributes: [
+                .font: smallFont,
+                .foregroundColor: NSColor.white
+            ]))
+        }
+
         result.append(NSAttributedString(string: " 7d:", attributes: dimAttrs))
         result.append(NSAttributedString(string: String(format: "%.0f%%", pct7d), attributes: [
             .font: font,
