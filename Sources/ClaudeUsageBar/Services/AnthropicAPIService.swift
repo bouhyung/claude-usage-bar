@@ -235,6 +235,7 @@ final class AuthService: ObservableObject {
             if previous5hPct >= 20 && new5hPct < previous5hPct * 0.3 {
                 sendResetNotification()
                 showResetFlash()
+                schedulePostResetRefresh()
             }
             previous5hPct = new5hPct
 
@@ -264,6 +265,14 @@ final class AuthService: ObservableObject {
         } else {
             // Fallback for swift run (no bundle identifier)
             NSSound.beep()
+        }
+    }
+
+    private func schedulePostResetRefresh() {
+        Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchUsage(force: true)
+            }
         }
     }
 
